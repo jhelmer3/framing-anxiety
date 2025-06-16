@@ -1,2 +1,2 @@
 # framing-anxiety
-Repository for work on the framing effect nad anxiety.
+Repository for work on the framing effect and anxiety.
