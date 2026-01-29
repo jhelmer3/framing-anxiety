@@ -267,7 +267,9 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb3-43"><a href="#cb3-43" aria-hidden="true" tabindex="-1"></a>            <span class="at">by =</span> <span class="st">"id"</span>) <span class="sc">|&gt;</span></span>
 <span id="cb3-44"><a href="#cb3-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ev_varied =</span> <span class="fu">ifelse</span>(frame <span class="sc">==</span> <span class="st">"L"</span>, <span class="dv">100</span> <span class="sc">-</span> varied, varied),</span>
 <span id="cb3-45"><a href="#cb3-45" aria-hidden="true" tabindex="-1"></a>         <span class="at">ev_fixed =</span> <span class="fu">ifelse</span>(frame <span class="sc">==</span> <span class="st">"L"</span>, <span class="dv">100</span> <span class="sc">-</span> fixed, fixed),</span>
-<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>         <span class="at">lottery_certain_diff =</span> lottery_std <span class="sc">-</span> certain_std)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true" tabindex="-1"></a>         <span class="at">lottery_certain_diff =</span> lottery_std <span class="sc">-</span> certain_std,</span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true" tabindex="-1"></a>         <span class="fu">across</span>(<span class="fu">c</span>(IUS, lottery_certain_diff), <span class="sc">~</span> (.x <span class="sc">-</span> <span class="fu">mean</span>(.x)) <span class="sc">/</span> <span class="fu">sd</span>(.x),</span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true" tabindex="-1"></a>                <span class="at">.names =</span> <span class="st">"{.col}_z"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
 </div>
