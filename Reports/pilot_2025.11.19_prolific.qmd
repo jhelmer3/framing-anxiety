@@ -1,0 +1,112 @@
+---
+title: "Prolific 2025-11-19"
+date: last-modified
+toc: true
+format: 
+  html:
+    code-fold: true
+    grid: 
+      margin-width: 350px
+      gutter-width: 1em
+author: Jessica Helmer
+knitr:
+    opts_chunk: 
+      dev: "ragg_png"
+---
+
+## Setup
+
+::: panel-tabset
+#### Setup
+```{r}
+#| message: false
+#| code-fold: show
+library(tidyverse)
+```
+
+#### Reading
+
+```{r}
+#| message: false
+#| code-fold: show
+dat_full <- qualtRics::read_survey(here::here("..", "Data", "prolific_2025.11.19.csv")) |>
+  mutate(id = row_number(),
+         .keep = "unused")
+```
+
+:::
+
+#### Cleaning
+
+```{r}
+dat <- dat_full |>
+  select(id, matches("^[F][GL][PV]_[0-9\\.-]+$")) |>
+  pivot_longer(!id,
+               names_to = "item", values_to = "response") |>
+  filter(!is.na(response)) |>
+  separate_wider_regex(item, c(cond = "[F][GL][PV]", "_", rest = ".*")) |>
+  separate_wider_regex(rest, c(fixed = "^\\d*", "-*", rest = ".*")) |>
+  separate_wider_delim(rest, "-", names = c("varied"), too_few = "align_end") |>
+  separate_wider_position(cond, c(1, "frame" = 1, "target" = 1)) |>
+  mutate(.by = c(frame, target, fixed),
+         item = cur_group_id(),
+         .after = id) |>
+  mutate(.by = c(item, id),
+         trial = 1:n(),
+         .after = id) |>
+  mutate(varied = as.numeric(varied),
+         fixed = as.numeric(fixed),
+         lottery = ifelse(target == "P", varied, fixed),
+         certain = ifelse(target == "V", varied, fixed),
+         
+         lottery_std = (lottery - mean(lottery)) / sd(lottery),
+         certain_std = (certain - mean(certain)) / sd(lottery),
+         
+         # if matches the fixed dollar option, 0, else 1 (for risky)
+         chose_risky = ifelse(str_detect(response, "Keep \\$[0-9]+") | 
+                                str_detect(response, "Forfeit \\$[0-9]+"), 0, 1)) |>
+  left_join(dat_full |>
+              select(id, starts_with("IUS") & !matches("IUS_T")) |>
+              pivot_longer(!id, names_to = "item", values_to = "response") |>
+              mutate(response = case_when(response == "Entirely characteristic of me" ~ 5,
+                                          response == "Very characteristic of me" ~ 4,
+                                          response == "Somewhat characteristic of me" ~ 3,
+                                          response == "A little characteristic of me" ~ 2,
+                                          response == "Not at all characteristic of me" ~ 1)) |>
+              summarize(.by = id,
+                        IUS = mean(response)),
+            by = "id") |>
+  mutate(ev_varied = ifelse(frame == "L", 100 - varied, varied),
+         ev_fixed = ifelse(frame == "L", 100 - fixed, fixed),
+         lottery_certain_diff = lottery_std - certain_std,
+         across(c(IUS, lottery_certain_diff), ~ (.x - mean(.x)) / sd(.x),
+                .names = "{.col}_z"))
+```
+
+### Modeling
+
+```{r}
+m0 <- lme4::glmer(chose_risky ~ 1 + (1 | item) + (1 | id),
+            dat, family = "binomial")
+sjPlot::tab_model(m0)
+
+m1 <- lme4::glmer(chose_risky ~ IUS * lottery_certain_diff * frame + (1 | item) + (1 | id), 
+                  dat, family = "binomial")
+sjPlot::tab_model(m1)
+```
+
+
+```{r}
+m1 |>
+  ggeffects::ggpredict(terms = c("IUS", "frame")) |>
+  plot() +
+  theme_classic()
+
+m1 |>
+  ggeffects::ggpredict(terms = c("IUS", "lottery_certain_diff")) |>
+  plot() +
+  theme_classic()
+```
+
+
+

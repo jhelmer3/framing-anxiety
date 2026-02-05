@@ -1,0 +1,218 @@
+---
+title: "Prolific 2026-01-14"
+date: last-modified
+toc: true
+format: 
+  html:
+    code-fold: true
+    grid: 
+      body-width: "800"
+author: Jessica Helmer
+knitr:
+    opts_chunk: 
+      dev: "ragg_png"
+---
+
+## Setup
+
+::: panel-tabset
+#### Setup
+```{r}
+#| message: false
+#| code-fold: show
+library(tidyverse)
+```
+
+#### Reading
+
+```{r}
+#| message: false
+#| code-fold: show
+dat_full <- qualtRics::read_survey(here::here("..", "Data", "prolific_2026.01.14.csv")) |>
+  mutate(id = row_number(),
+         .keep = "unused") |>
+  filter(Progress == 100)
+```
+
+#### File Structure
+```{r}
+if (!file.exists(here::here("Models"))) dir.create(here::here("Models"))
+```
+:::
+
+#### Cleaning
+
+```{r}
+#| code-fold: show
+dat <- dat_full |>
+  select(id, matches("^[F][GL][PV]_[0-9\\.-]+$")) |>
+  pivot_longer(!id,
+               names_to = "item", values_to = "response") |>
+  filter(!is.na(response)) |>
+  separate_wider_regex(item, c(cond = "[F][GL][PV]", "_", rest = ".*")) |>
+  separate_wider_regex(rest, c(fixed = "^\\d*", "-*", rest = ".*")) |>
+  separate_wider_delim(rest, "-", names = c("varied"), too_few = "align_end") |>
+  separate_wider_position(cond, c(1, "frame" = 1, "target" = 1)) |>
+  mutate(.by = c(frame, target, fixed),
+         item = cur_group_id(),
+         .after = id) |>
+  mutate(.by = c(item, id),
+         trial = 1:n(),
+         .after = id) |>
+  mutate(varied = as.numeric(varied),
+         fixed = as.numeric(fixed),
+         lottery = ifelse(target == "P", varied, fixed),
+         certain = ifelse(target == "V", varied, fixed),
+         
+         lottery_std = (lottery - mean(lottery)) / sd(lottery),
+         certain_std = (certain - mean(certain)) / sd(lottery),
+         
+         # if matches the fixed dollar option, 0, else 1 (for risky)
+         chose_risky = ifelse(str_detect(response, "Keep \\$[0-9]+") | 
+                                str_detect(response, "Forfeit \\$[0-9]+"), 0, 1)) |>
+  left_join(dat_full |>
+              select(id, starts_with("IUS") & !matches("IUS_T")) |>
+              pivot_longer(!id, names_to = "item", values_to = "response") |>
+              mutate(response = case_when(response == "Entirely characteristic of me" ~ 5,
+                                          response == "Very characteristic of me" ~ 4,
+                                          response == "Somewhat characteristic of me" ~ 3,
+                                          response == "A little characteristic of me" ~ 2,
+                                          response == "Not at all characteristic of me" ~ 1)) |>
+              summarize(.by = id,
+                        IUS = mean(response)),
+            by = "id") |>
+    left_join(dat_full |>
+              select(id, starts_with("BIS/BAS") & !matches("BISBAS_T")) |>
+              pivot_longer(!id, names_to = "item", values_to = "response") |>
+              mutate(response = case_when(response == "Very true for me" ~ 4,
+                                          response == "Somewhat true for me" ~ 3,
+                                          response == "Somewhat false for me" ~ 2,
+                                          response == "Very false for me" ~ 1)) |>
+              summarize(.by = id,
+                        BIS_BAS = mean(response)),
+            by = "id") |>
+      left_join(dat_full |>
+              select(id, starts_with("STAI-T") & !matches("STAI-T_T")) |>
+              pivot_longer(!id, names_to = "item", values_to = "response") |>
+                # double check these codings
+              mutate(response = case_when(response == "Almost never" ~ 4,
+                                          response == "Often" ~ 3,
+                                          response == "Sometimes" ~ 2,
+                                          response == "Almost always" ~ 1)) |>
+              summarize(.by = id,
+                        STAI_T = mean(response)),
+            by = "id") |>
+  mutate(ev_varied = ifelse(frame == "L", 100 - varied, varied),
+         ev_fixed = ifelse(frame == "L", 100 - fixed, fixed),
+         lottery_certain_diff = lottery_std - certain_std,
+         across(c(IUS, BIS_BAS, STAI_T), ~ (.x - mean(.x)) / sd(.x),
+                .names = "{.col}_z"))
+```
+
+### Modeling
+
+```{r}
+#| eval: false
+m0 <- lme4::glmer(chose_risky ~ 1 + (1 | item) + (1 | id),
+            dat, family = "binomial")
+saveRDS(m0, here::here("Models", "risky-choice_0.rds"))
+
+m1.0 <- lme4::glmer(chose_risky ~ IUS_z + BIS_BAS_z + STAI_T_z + lottery_certain_diff + frame + 
+                      (1 | item) + (1 | id), 
+                  dat, family = "binomial",
+                  lme4::glmerControl(optimizer = "bobyqa"))
+saveRDS(m1.0, here::here("Models", "risky-choice_1.0.rds"))
+
+m1.1 <- lme4::glmer(chose_risky ~ IUS_z + BIS_BAS_z + STAI_T_z + lottery_certain_diff + frame + 
+                      IUS_z:frame + BIS_BAS_z:frame + STAI_T_z:frame + lottery_certain_diff:frame +
+                      IUS_z:lottery_certain_diff + BIS_BAS_z:lottery_certain_diff + STAI_T_z:lottery_certain_diff +
+                    (1 | item) + (1 | id), 
+                  dat, family = "binomial",
+                  lme4::glmerControl(optimizer = "bobyqa"))
+saveRDS(m1.1, here::here("Models", "risky-choice_1.1.rds"))
+```
+
+::: {style="font-size:70%"}
+``` {r}
+#| layout-ncol: 3
+m0 <- readRDS(here::here("Models", "risky-choice_0.rds"))
+m1.0 <- readRDS(here::here("Models", "risky-choice_1.0.rds"))
+m1.1 <- readRDS(here::here("Models", "risky-choice_1.1.rds"))
+
+sjPlot::tab_model(m0,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR",
+                 title = "Unconditional")
+sjPlot::tab_model(m1.0,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR",
+                 title = "No Interactions")
+sjPlot::tab_model(m1.1,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR",
+                 title = "Some Interactions")
+```
+:::
+
+##### Interaction Effects
+
+```{r}
+#| layout-ncol: 3
+#| fig-width: 4
+#| fig-height: 3
+effect_labels <- list("STAI_T_z[all]" = "STAI_T",
+                      "frame" = "Frame",
+                      "IUS_z[all]" = "IUS",
+                      "lottery_certain_diff[all]" = "Lottery - Certain",
+                      "lottery_certain_diff" = "Lottery - Certain")
+
+sig_interactions <- list(c("STAI_T_z[all]", "frame"),
+                         c("lottery_certain_diff[all]", "frame"),
+                         c("IUS_z[all]", "lottery_certain_diff"))
+
+sig_interactions |> walk(~ (ggeffects::ggpredict(m1.1, .x) |>
+                              plot() +
+                              labs(title = NULL, y = "P(Chose Risky)",
+                                   x = effect_labels[.x[1]],
+                                   fill = effect_labels[.x[2]],
+                                   color = effect_labels[.x[2]]) +
+                              coord_cartesian(ylim = c(0, 1)) +
+                              theme_classic(base_size = 12) +
+                              theme(aspect.ratio = 1,
+                                    legend.position = "bottom")) |>
+                           print())
+```
+
+
+##### Main Effects
+
+```{r}
+#| layout-ncol: 3
+#| fig-width: 4
+#| fig-height: 3
+sig_mains <- list("STAI_T_z[all]", "lottery_certain_diff[all]", "frame")
+
+sig_mains |> walk(~ (ggeffects::ggpredict(m1.1, .x) |>
+                              plot() +
+                              labs(title = NULL, y = "P(Chose Risky)",
+                                   x = effect_labels[.x]) +
+                              coord_cartesian(ylim = c(0, 1)) +
+                              theme_classic(base_size = 12) +
+                              theme(aspect.ratio = 1)) |>
+                           print())
+```
+
+
+

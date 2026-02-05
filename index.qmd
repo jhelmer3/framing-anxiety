@@ -1,0 +1,18 @@
+---
+title: "Framing and Anxiety"
+subtitle: "Analysis"
+date: last-modified
+author: "Jessica Helmer"
+---
+
+## Overview
+
+This is work on our framing and anxiety project!
+
+First, here is cleaning and analysis of the risky choice piece of the Prolific pilot study:
+
+[2025-11-19 Prolific Pilot](Reports/pilot_2025.11.19_prolific.qmd)
+
+Next, here is cleaning and analysis of the risky choice piece of the entire Prolific sample:
+
+[2026-01-14 Prolific Study](Reports/2026.01.14_prolific.qmd)

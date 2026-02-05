@@ -1,0 +1,22 @@
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Framing and Anxiety"
+  navbar:
+    left:
+      - text: "Home"
+        href: index.qmd
+      - text: "Pilot Data"
+        menu:
+          - Reports/pilot_2025.11.19_prolific.qmd
+      - text: "Main Study Data"
+        menu:
+          - Reports/2026.01.14_prolific.qmd
+
+format:
+  html:
+    theme: cosmo
+    css: styles.css
+    toc: true
