@@ -36,6 +36,7 @@ dat_full <- qualtRics::read_survey(here::here("..", "Data", "prolific_2026.01.14
 
 #### File Structure
 ```{r}
+#| code-fold: show
 if (!file.exists(here::here("Models"))) dir.create(here::here("Models"))
 ```
 :::
@@ -215,5 +216,84 @@ sig_mains |> walk(~ (ggeffects::ggpredict(m1.1, .x) |>
                            print())
 ```
 
+### Anxiety Scales Separate Models
 
+```{r}
+#| eval: false
+m1.2.1 <- lme4::glmer(chose_risky ~ IUS_z * lottery_certain_diff * frame +
+                    (1 | item) + (1 | id), 
+                  dat, family = "binomial",
+                  lme4::glmerControl(optimizer = "bobyqa"))
+m1.2.2 <- lme4::glmer(chose_risky ~ STAI_T_z * lottery_certain_diff * frame +
+                    (1 | item) + (1 | id), 
+                  dat, family = "binomial",
+                  lme4::glmerControl(optimizer = "bobyqa"))
+m1.2.3 <- lme4::glmer(chose_risky ~ BIS_BAS_z * lottery_certain_diff * frame +
+                    (1 | item) + (1 | id), 
+                  dat, family = "binomial",
+                  lme4::glmerControl(optimizer = "bobyqa"))
+
+saveRDS(m1.2.1, here::here("Models", "risky-choice_1.2.1.rds"))
+saveRDS(m1.2.2, here::here("Models", "risky-choice_1.2.2.rds"))
+saveRDS(m1.2.3, here::here("Models", "risky-choice_1.2.3.rds"))
+```
+
+
+```{r}
+#| layout-ncol: 3
+m1.2.1 <- readRDS(here::here("Models", "risky-choice_1.2.1.rds"))
+m1.2.2 <- readRDS(here::here("Models", "risky-choice_1.2.2.rds"))
+m1.2.3 <- readRDS(here::here("Models", "risky-choice_1.2.3.rds"))
+
+sjPlot::tab_model(m1.2.1,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR")
+
+sjPlot::tab_model(m1.2.2,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR")
+
+sjPlot::tab_model(m1.2.3,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR")
+```
+
+
+```{r}
+#| layout-ncol: 3
+#| layout-nrow: 2
+list(scale = list("IUS_z", "STAI_T_z", "BIS_BAS_z"),
+     model = list(m1.2.1, m1.2.2, m1.2.3)) |>
+  pwalk(\(scale, model) (ggeffects::ggpredict(model, terms = c("lottery_certain_diff[all]", scale, "frame")) |>
+                              plot() +
+                              labs(title = scale, y = "P(Chose Risky)") +
+                              coord_cartesian(ylim = c(0, 1)) +
+                              theme_classic(base_size = 12) +
+                              theme(aspect.ratio = 1,
+                                    legend.position = "bottom")) |>
+         print())
+
+list(scale = list("IUS_z", "STAI_T_z ", "BIS_BAS_z"),
+     model = list(m1.2.1, m1.2.2, m1.2.3)) |>
+  pwalk(\(scale, model) (ggeffects::ggpredict(model, terms = c(paste(scale, "[all]"), "frame")) |>
+                              plot() +
+                              labs(title = scale, y = "P(Chose Risky)") +
+                              coord_cartesian(ylim = c(0, 1)) +
+                              theme_classic(base_size = 12) +
+                              theme(aspect.ratio = 1,
+                                    legend.position = "bottom")) |>
+         print())
+```
 
