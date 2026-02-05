@@ -170,8 +170,9 @@ sjPlot::tab_model(m1.1,
 
 ```{r}
 #| layout-ncol: 3
-#| fig-width: 4
+#| fig-width: 3
 #| fig-height: 3
+#| message: false
 effect_labels <- list("STAI_T_z[all]" = "STAI_T",
                       "frame" = "Frame",
                       "IUS_z[all]" = "IUS",
@@ -200,7 +201,7 @@ sig_interactions |> walk(~ (ggeffects::ggpredict(m1.1, .x) |>
 
 ```{r}
 #| layout-ncol: 3
-#| fig-width: 4
+#| fig-width: 3
 #| fig-height: 3
 sig_mains <- list("STAI_T_z[all]", "lottery_certain_diff[all]", "frame")
 
