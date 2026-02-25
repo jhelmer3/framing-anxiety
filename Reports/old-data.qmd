@@ -1,0 +1,218 @@
+---
+title: "Mark's Old Data"
+date: last-modified
+toc: true
+format: 
+  html:
+    code-fold: true
+    grid: 
+      margin-width: 350px
+      gutter-width: 1em
+author: Jessica Helmer
+knitr:
+    opts_chunk: 
+      dev: "ragg_png"
+---
+
+## Setup
+
+::: panel-tabset
+#### Setup
+```{r}
+#| message: false
+#| code-fold: show
+library(tidyverse)
+```
+
+#### Reading
+```{r}
+#| message: false
+#| code-fold: show
+dat_mess <- qualtRics::read_survey(here::here("..", "Data", "old-data.csv")) |>
+  mutate(id = row_number(),
+         .keep = "unused")
+```
+:::
+
+#### Cleaning
+
+Cleaning the old data. 
+
+```{r}
+# note FGV 85 corresponds to 95 and 52 to 50. checked in survey.
+
+# dat |> select(starts_with("FGV5-5"), starts_with("FLV5")) |> View() # to see that the larger number ones are the FLV ones
+# dat |> select(starts_with("FGV50-38"), starts_with("FLV50")) |> View() # to see that the larger number ones are the FLV ones
+
+dat <- dat_mess |>
+  select(id, matches("^[F][GL][PV][0-9\\.-]+$"),
+         # named these two wrong
+         matches("^FPG75[0-9-]+$"), 
+         matches("^FVG75[0-9-]+$")) |>
+  # flipping second and third characters bc named wrong
+  rename_with(.cols = matches("^FPG75[0-9-]+$") | matches("^FVG75[0-9-]+$"),
+              ~ paste0(substr(.x, 1, 1),
+                       substr(.x, 3, 3),
+                       substr(.x, 2, 2),
+                       substr(.x, 4, nchar(.x)))) |>
+  # more that were named wrong
+  # hardcoding name change, see above for justification code
+  rename(`FGV5-5` = `FGV5-5...332`,
+         `FLV5-5` = `FGV5-5...691`,
+         `FGV50-38` = `FGV50-38...183`,
+         `FLV50-38` = `FGV50-38...530`) |>
+  pivot_longer(!id,
+               names_to = "item", values_to = "response") |>
+  filter(!is.na(response)) |>
+  separate_wider_regex(item, c(cond = "[F][GL][PV]", rest = ".*")) |>
+  separate_wider_regex(rest, c(fixed = "^\\d*", "-*", rest = ".*")) |>
+  separate_wider_delim(rest, "-", names = c("trace", "varied"), too_few = "align_end") |>
+  mutate(varied = ifelse(varied == "", fixed, varied),
+         fixed = case_when(fixed == "85" ~ "95",
+                           fixed == "52" ~ "50",
+                           fixed == "5" ~ "05",
+                           .default = fixed)) |>
+  separate_wider_position(cond, c(1, "frame" = 1, "target" = 1)) |>
+  mutate(.by = c(frame, target, fixed),
+         item = cur_group_id(),
+         .after = id) |>
+  mutate(.by = c(item, id),
+         trial = 1:n(),
+         .after = id) |>
+  # only two types of responses within a combo of item, trial, and varied
+  mutate(.by = c(item, varied),
+         optct = length(unique(response)),
+         optmin = min(response),
+         optmax = max(response)) |>
+  mutate(choice = case_when(
+    optct > 1 & response == optmin ~ 0,
+    optct > 1 & response == optmax ~ 1,
+    optct == 1 & response == 1 ~ 0,
+    optct == 1 & response == optmax ~ 1) |>
+      factor(0:1, labels = c("fixed", "risky")),
+    varied = as.numeric(varied),
+    fixed = as.numeric(fixed),
+    lottery = ifelse(target == "P", varied, fixed),
+    certain = ifelse(target == "V", varied, fixed),
+    lottery_std = (lottery - mean(lottery)) / sd(lottery),
+    certain_std = (certain - mean(certain)) / sd(lottery),
+    risky = ifelse(choice == "risky", 1, 0)) |>
+  left_join(dat_mess |>
+              select(id, starts_with("IUS") & !matches("IUSt")) |>
+              pivot_longer(!id, names_to = "item", values_to = "response") |>
+              summarize(.by = id,
+                        IUS = mean(response)),
+            by = "id") |>
+  mutate(ev_varied = ifelse(frame == "L", 100 - varied, varied),
+         ev_fixed = ifelse(frame == "L", 100 - fixed, fixed),
+         chose_risky = ifelse(choice == "risky", 1, 0),
+         lottery_certain_diff = lottery_std - certain_std,
+         across(IUS, ~ (.x - mean(.x, na.rm = T)) / sd(.x, na.rm = T),
+                .names = "{.col}_z")) 
+
+# filter(dat, .by = c(item, id), max(trial) == 1) # 18 instances (6 people) of only one trial
+```
+
+Calculating Subjective Certainty Equivalence (SCE) and Subjective Probability Equivalence (SCP) values for each person and item. If the participant selected the choice of the varying factor, the SxE should be less appealing than the last trial by half the distance between the varying factor value in the final two rounds. If the participant selected the choice of the fixed factor, the the SxE should be more appealing than the last trial by half the distance between the varying factor value in the final two rounds. 
+
+```{r}
+SxE <- dat |>
+  filter(.by = c(id, item),
+         trial == max(trial) | trial == max(trial) - 1) |> 
+  summarize(.by = c(id, item),
+            frame = first(frame),
+            target = first(target),
+            fixed = first(ev_fixed),
+            SxE = case_when(target == "P" & last(choice) == "risky" ~ last(ev_varied) - abs(last(ev_varied) - first(ev_varied)) / 2,
+                            target == "P" & last(choice) == "fixed" ~ last(ev_varied) + abs(last(ev_varied) - first(ev_varied)) / 2,
+                            target == "V" & last(choice) == "risky" ~ last(ev_varied) + abs(last(ev_varied) - first(ev_varied)) / 2,
+                            target == "V" & last(choice) == "fixed" ~ last(ev_varied) - abs(last(ev_varied) - first(ev_varied)) / 2),
+            ev_fixed = first(ev_fixed))
+```
+
+Here are the trends of the expected value of the fixed factor and the subjective equivalent of the varying factor.
+
+```{r}
+#| layout-ncol: 2
+#| message: false
+#| fig-width: 4
+#| fig-height: 4
+SPE <- SxE |>
+  filter(target == "P") |>
+  lme4::lmer(SxE ~ ev_fixed + frame + (1 | id) + (1 | item), data = _)
+
+SPE |>
+  ggeffects::ggpredict(terms = c("ev_fixed", "frame")) |>
+  plot() +
+  scale_x_continuous(labels = scales::label_currency(),
+                     breaks = c(5, 25, 50, 75, 95)) +
+  scale_y_continuous(labels = scales::label_percent(scale = 1),
+                     breaks = c(5, 25, 50, 75, 95)) +
+  coord_cartesian(xlim = c(0, 100), ylim = c(0, 100)) +
+  labs(y = "SPE", title = "Subjective Probability Equivalence", x = "EV Certain") +
+  theme(aspect.ratio = 1,
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(color = "gray80", linewidth = 2))
+
+SCE <- SxE |>
+  filter(target == "V") |>
+  lme4::lmer(SxE ~ ev_fixed + frame + (1 | id) + (1 | item), data = _)
+
+SCE |>
+  ggeffects::ggpredict(terms = c("ev_fixed", "frame")) |>
+  plot() +
+  scale_y_continuous(labels = scales::label_currency(),
+                     breaks = c(5, 25, 50, 75, 95), limits = c(0, 100)) +
+  scale_x_continuous(labels = scales::label_percent(scale = 1),
+                     breaks = c(5, 25, 50, 75, 95), limits = c(0, 100)) +
+  coord_flip() +
+  labs(x = "SCE", title = "Subjective Certainity Equivalence", y = "EV Probability")  +
+  theme(aspect.ratio = 1,
+        panel.grid.minor = element_blank(),
+        panel.border = element_rect(color = "gray80", linewidth = 2))
+```
+
+```{r}
+m0 <- lme4::glmer(chose_risky ~ 1 + (1 | item) + (1 | id),
+            dat, family = "binomial")
+
+m1.0 <- lme4::glmer(chose_risky ~ IUS_z + lottery_certain_diff + frame + 
+                      (1 | item) + (1 | id), 
+                  dat, family = "binomial")
+
+m1.1 <- lme4::glmer(chose_risky ~ IUS_z + lottery_certain_diff + frame + 
+                      IUS_z:frame + IUS_z:lottery_certain_diff + frame:lottery_certain_diff +
+                    (1 | item) + (1 | id), 
+                  dat, family = "binomial")
+```
+
+::: {style="font-size:70%"}
+``` {r}
+#| layout-ncol: 3
+sjPlot::tab_model(m0,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR",
+                 title = "Unconditional")
+sjPlot::tab_model(m1.0,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR",
+                 title = "No Interactions")
+sjPlot::tab_model(m1.1,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR",
+                 title = "Some Interactions")
+```
+:::
+
