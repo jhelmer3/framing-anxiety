@@ -13,7 +13,7 @@ First, here is our analysis of Mark's Master's thesis data:
 
 [Mark's Data](Reports/old-data.qmd)
 
-First, here is cleaning and analysis of the risky choice piece of the Prolific pilot study:
+Here is cleaning and analysis of the risky choice piece of the Prolific pilot study:
 
 [2025-11-19 Prolific Pilot](Reports/pilot_2025.11.19_prolific.qmd)
 
