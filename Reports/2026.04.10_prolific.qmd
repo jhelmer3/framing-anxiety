@@ -127,7 +127,7 @@ imap(BIS |> select(-id), \(data, var) tibble(data) |>
        ggplot(aes(x = data)) +
        geom_bar() +
        labs(x = var) +
-       scale_x_continuous(limits = c(0.5, 5.5),
+       scale_x_continuous(limits = c(0.5, 4.5),
                           breaks = 1:5) + 
        scale_y_continuous(NULL,
                           breaks = NULL) +
@@ -168,7 +168,7 @@ imap(BAS |> select(-id), \(data, var) tibble(data) |>
        ggplot(aes(x = data)) +
        geom_bar() +
        labs(x = var) +
-       scale_x_continuous(limits = c(0.5, 5.5),
+       scale_x_continuous(limits = c(0.5, 4.5),
                           breaks = 1:5) + 
        scale_y_continuous(NULL,
                           breaks = NULL) +
@@ -211,7 +211,7 @@ imap(STAI |> select(-id), \(data, var) tibble(data) |>
        ggplot(aes(x = data)) +
        geom_bar() +
        labs(x = var) +
-       scale_x_continuous(limits = c(0.5, 5.5),
+       scale_x_continuous(limits = c(0.5, 4.5),
                           breaks = 1:5) + 
        scale_y_continuous(NULL,
                           breaks = NULL) +
