@@ -57,11 +57,13 @@ dat_full |>
                 p = table(.x) |> prop.table() |> as_tibble()) |>
          unnest(cols = p)) |>
   list_rbind() |>
-  rename(`Check` = `.x`,
+  rename(`Attention Check` = `.x`,
          p = n) |>
   gt(rowname_col = "var") |>
   fmt_percent(columns = p,
-              decimals = 1)
+              decimals = 1) |>
+  cols_label("p" = " ") |>
+  tab_options(table.font.size = 12)
 ```
 
 

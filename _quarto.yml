@@ -14,6 +14,7 @@ website:
       - text: "Main Study Data"
         menu:
           - Reports/2026.01.14_prolific.qmd
+          - Reports/2026.04.10_prolific.qmd
 
 format:
   html:
