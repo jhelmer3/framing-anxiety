@@ -1,5 +1,5 @@
 ---
-title: "Prolific 2026-01-14"
+title: "Prolific 2026-01-14 (Old)"
 date: last-modified
 toc: true
 format: 
@@ -11,6 +11,7 @@ author: Jessica Helmer
 knitr:
     opts_chunk: 
       dev: "ragg_png"
+html-table-processing: none
 ---
 
 ## Setup
@@ -21,6 +22,7 @@ knitr:
 #| message: false
 #| code-fold: show
 library(tidyverse)
+library(patchwork)
 ```
 
 #### Reading
@@ -72,7 +74,7 @@ dat <- dat_full |>
          chose_risky = ifelse(str_detect(response, "Keep \\$[0-9]+") | 
                                 str_detect(response, "Forfeit \\$[0-9]+"), 0, 1)) |>
   left_join(dat_full |>
-              select(id, starts_with("IUS") & !matches("IUS_T")) |>
+              select(id, starts_with("IUS"), -matches("IUS_T"), -matches("IUS_02_5")) |>
               pivot_longer(!id, names_to = "item", values_to = "response") |>
               mutate(response = case_when(response == "Entirely characteristic of me" ~ 5,
                                           response == "Very characteristic of me" ~ 4,
@@ -83,7 +85,7 @@ dat <- dat_full |>
                         IUS = mean(response)),
             by = "id") |>
     left_join(dat_full |>
-              select(id, starts_with("BIS/BAS") & !matches("BISBAS_T")) |>
+              select(id, starts_with("BIS/BAS"), -matches("BISBAS_T"), -matches("BIS/BAS_03_4")) |>
               pivot_longer(!id, names_to = "item", values_to = "response") |>
               mutate(response = case_when(response == "Very true for me" ~ 4,
                                           response == "Somewhat true for me" ~ 3,
@@ -93,7 +95,7 @@ dat <- dat_full |>
                         BIS_BAS = mean(response)),
             by = "id") |>
       left_join(dat_full |>
-              select(id, starts_with("STAI-T") & !matches("STAI-T_T")) |>
+              select(id, starts_with("STAI-T"), -matches("STAI-T_T"), -matches("STAI-T_04_3")) |>
               pivot_longer(!id, names_to = "item", values_to = "response") |>
                 # double check these codings
               mutate(response = case_when(response == "Almost never" ~ 4,
@@ -110,19 +112,19 @@ dat <- dat_full |>
                 .names = "{.col}_z"))
 ```
 
-### Modeling
+## Modeling
 
 ```{r}
 #| eval: false
 m0 <- lme4::glmer(chose_risky ~ 1 + (1 | item) + (1 | id),
             dat, family = "binomial")
-saveRDS(m0, here::here("Models", "risky-choice_0.rds"))
+saveRDS(m0, here::here("Models", "risky-choice_0_old.rds"))
 
 m1.0 <- lme4::glmer(chose_risky ~ IUS_z + BIS_BAS_z + STAI_T_z + lottery_certain_diff + frame + 
                       (1 | item) + (1 | id), 
                   dat, family = "binomial",
                   lme4::glmerControl(optimizer = "bobyqa"))
-saveRDS(m1.0, here::here("Models", "risky-choice_1.0.rds"))
+saveRDS(m1.0, here::here("Models", "risky-choice_1.0_old.rds"))
 
 m1.1 <- lme4::glmer(chose_risky ~ IUS_z + BIS_BAS_z + STAI_T_z + lottery_certain_diff + frame + 
                       IUS_z:frame + BIS_BAS_z:frame + STAI_T_z:frame + lottery_certain_diff:frame +
@@ -130,15 +132,15 @@ m1.1 <- lme4::glmer(chose_risky ~ IUS_z + BIS_BAS_z + STAI_T_z + lottery_certain
                     (1 | item) + (1 | id), 
                   dat, family = "binomial",
                   lme4::glmerControl(optimizer = "bobyqa"))
-saveRDS(m1.1, here::here("Models", "risky-choice_1.1.rds"))
+saveRDS(m1.1, here::here("Models", "risky-choice_1.1_old.rds"))
 ```
 
 ::: {style="font-size:70%"}
 ``` {r}
 #| layout-ncol: 3
-m0 <- readRDS(here::here("Models", "risky-choice_0.rds"))
-m1.0 <- readRDS(here::here("Models", "risky-choice_1.0.rds"))
-m1.1 <- readRDS(here::here("Models", "risky-choice_1.1.rds"))
+m0 <- readRDS(here::here("Models", "risky-choice_0_old.rds"))
+m1.0 <- readRDS(here::here("Models", "risky-choice_1.0_old.rds"))
+m1.1 <- readRDS(here::here("Models", "risky-choice_1.1_old.rds"))
 
 sjPlot::tab_model(m0,
                  show.ci = F,
@@ -216,7 +218,7 @@ sig_mains |> walk(~ (ggeffects::ggpredict(m1.1, .x) |>
                            print())
 ```
 
-### Anxiety Scales Separate Models
+## Anxiety Scales Separate Models
 
 ```{r}
 #| eval: false
@@ -233,18 +235,18 @@ m1.2.3 <- lme4::glmer(chose_risky ~ BIS_BAS_z * lottery_certain_diff * frame +
                   dat, family = "binomial",
                   lme4::glmerControl(optimizer = "bobyqa"))
 
-saveRDS(m1.2.1, here::here("Models", "risky-choice_1.2.1.rds"))
-saveRDS(m1.2.2, here::here("Models", "risky-choice_1.2.2.rds"))
-saveRDS(m1.2.3, here::here("Models", "risky-choice_1.2.3.rds"))
+saveRDS(m1.2.1, here::here("Models", "risky-choice_1.2.1_old.rds"))
+saveRDS(m1.2.2, here::here("Models", "risky-choice_1.2.2_old.rds"))
+saveRDS(m1.2.3, here::here("Models", "risky-choice_1.2.3_old.rds"))
 ```
 
 
 ::: {style="font-size:70%"}
 ```{r}
 #| layout-ncol: 3
-m1.2.1 <- readRDS(here::here("Models", "risky-choice_1.2.1.rds"))
-m1.2.2 <- readRDS(here::here("Models", "risky-choice_1.2.2.rds"))
-m1.2.3 <- readRDS(here::here("Models", "risky-choice_1.2.3.rds"))
+m1.2.1 <- readRDS(here::here("Models", "risky-choice_1.2.1_old.rds"))
+m1.2.2 <- readRDS(here::here("Models", "risky-choice_1.2.2_old.rds"))
+m1.2.3 <- readRDS(here::here("Models", "risky-choice_1.2.3_old.rds"))
 
 sjPlot::tab_model(m1.2.1,
                  show.ci = F,
@@ -301,4 +303,32 @@ list(scale = list("IUS_z", "STAI_T_z ", "BIS_BAS_z"),
                                     legend.position = "bottom")) |>
          print())
 ```
+
+
+## Item Coding
+
+This is what made me realize the recoding probably didn't go through.
+
+```{r}
+STAI <- dat_full |>
+  select(starts_with("STAI-T"), -matches("STAI-T_T"), -matches("STAI-T_04_3")) |>
+  mutate(across(everything(), ~ recode_values(.x,
+                                              "Almost never" ~ 4,
+                                              "Often" ~ 3,
+                                              "Sometimes" ~ 2,
+                                              "Almost always" ~ 1))) |>
+  rename_with(~ str_replace(.x, "-T", ""),
+              everything())
+
+STAI_model <- STAI |>
+              names() |>
+              paste(collapse = " + ") |>
+              paste("STAI =~ ", ... = _)
+
+lavaan::cfa(model = STAI_model,
+            data = STAI,
+            estimator = "MLR") |>
+  semPlot::semPaths(what = "est")
+```
+
 

@@ -20,3 +20,7 @@ Here is cleaning and analysis of the risky choice piece of the Prolific pilot st
 Next, here is cleaning and analysis of the risky choice piece of the entire Prolific sample:
 
 [2026-01-14 Prolific Study](Reports/2026.01.14_prolific.qmd)
+
+I think the variable recoding for items needed reverse codes didn't come through. Here's a new version after modifying the Qualtrics variable survey names:
+
+[2026-04-10 Prolific Study](Reports/2026.04.10_prolific.qmd)

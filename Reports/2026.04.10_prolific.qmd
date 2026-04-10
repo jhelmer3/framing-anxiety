@@ -1,0 +1,500 @@
+---
+title: "Prolific 2026-04-10"
+date: last-modified
+toc: true
+format: 
+  html:
+    code-fold: true
+    grid: 
+      body-width: "800"
+author: Jessica Helmer
+knitr:
+    opts_chunk: 
+      dev: "ragg_png"
+html-table-processing: none
+---
+
+The [](2026.01.14_prolific.qmd) document used data that I think was not recoded to align with scale direction. I renamed the values on Qualtrics, adding a `_r` tag to variables that *need* recoding. When I create recoded variables below, they will *not* have the `_r` tag. I also changed the BIS / BAS variable names to point specifically to their subscale (BIS or BAS).  
+
+## Setup
+
+::: panel-tabset
+#### Setup
+```{r}
+#| message: false
+#| code-fold: show
+library(tidyverse)
+library(patchwork)
+library(gt)
+```
+
+#### Reading
+```{r}
+#| message: false
+#| code-fold: show
+dat_full <- qualtRics::read_survey(here::here("..", "Data", "prolific_2026.04.10.csv")) |>
+  mutate(id = row_number(),
+         .keep = "unused") |>
+  filter(Progress == 100)
+```
+
+#### File Structure
+```{r}
+#| code-fold: show
+if (!file.exists(here::here("Models"))) dir.create(here::here("Models"))
+```
+:::
+
+## Cleaning
+
+### Attention Checks
+
+```{r}
+#| column: margin
+dat_full |>
+  select(matches("attention")) |>
+  imap(~ tibble(var = str_extract(.y, "([a-zA-Z-]+)_attention", group = 1),
+                p = table(.x) |> prop.table() |> as_tibble()) |>
+         unnest(cols = p)) |>
+  list_rbind() |>
+  rename(`Check` = `.x`,
+         p = n) |>
+  gt(rowname_col = "var") |>
+  fmt_percent(columns = p,
+              decimals = 1)
+```
+
+
+### Anxiety Scales
+
+Cleaning, histograms, and single-factor CFA for each anxiety scale, with BIS and BAS separated.
+
+::: {.callout-note collapse="true"}
+#### Intolerance of Uncertainity
+
+```{r}
+IUS <- dat_full |>
+  select(id, starts_with("IUS"), -matches("IUS_T"), -matches("IUS_attention")) |>
+  mutate(across(!id, ~ recode_values(.x,
+                                     "Entirely characteristic of me" ~ 5,
+                                     "Very characteristic of me" ~ 4,
+                                     "Somewhat characteristic of me" ~ 3,
+                                     "A little characteristic of me" ~ 2,
+                                     "Not at all characteristic of me" ~ 1)))
+
+imap(IUS |> select(-id), \(data, var) tibble(data) |>
+       ggplot(aes(x = data)) +
+       geom_bar() +
+       labs(x = var) +
+       scale_x_continuous(limits = c(0.5, 5.5),
+                          breaks = 1:5) + 
+       scale_y_continuous(NULL,
+                          breaks = NULL) +
+       guides(x = guide_axis(cap = "both")) +
+       theme_classic(base_size = 12) +
+       theme(axis.line.y = element_blank())) |>
+  wrap_plots()
+
+IUS_model <- IUS |>
+  select(-id) |>
+  names() |>
+  paste(collapse = " + ") |>
+  paste("IUS =~ ", ... = _)
+
+lavaan::cfa(model = IUS_model,
+            data = IUS,
+            estimator = "MLR") |>
+  semPlot::semPaths(what = "std")
+```
+:::
+
+::: {.callout-note collapse="true"}
+#### Behavioral Inhibition Scale
+
+```{r}
+BIS <- dat_full |>
+  select(id, starts_with("BIS"), -matches("BISBAS_T"), -matches("BISBAS_attention")) |>
+  mutate(across(!id, ~ recode_values(.x,
+                                     "Very true for me" ~ 4,
+                                     "Somewhat true for me" ~ 3,
+                                     "Somewhat false for me" ~ 2,
+                                     "Very false for me" ~ 1))) |>
+  mutate(across(ends_with("_r"), ~ 5 - .x,
+                .names = "{str_replace(.col, '_r', '')}"),
+         .keep = "unused")
+
+imap(BIS |> select(-id), \(data, var) tibble(data) |>
+       ggplot(aes(x = data)) +
+       geom_bar() +
+       labs(x = var) +
+       scale_x_continuous(limits = c(0.5, 5.5),
+                          breaks = 1:5) + 
+       scale_y_continuous(NULL,
+                          breaks = NULL) +
+       guides(x = guide_axis(cap = "both")) +
+       theme_classic(base_size = 12) +
+       theme(axis.line.y = element_blank())) |>
+  wrap_plots()
+
+BIS_model <- BIS |>
+  select(-id) |>
+  names() |>
+  paste(collapse = " + ") |>
+  paste("BIS =~ ", ... = _)
+
+lavaan::cfa(model = BIS_model,
+            data = BIS,
+            estimator = "MLR") |>
+  semPlot::semPaths(what = "std")
+```
+:::
+
+::: {.callout-note collapse="true"}
+#### Behavioral Activation Scale
+
+```{r}
+BAS <- dat_full |>
+  select(id, starts_with("BAS"), -matches("BISBAS_T"), -matches("BISBAS_attention")) |>
+  mutate(across(!id, ~ recode_values(.x,
+                                     "Very true for me" ~ 4,
+                                     "Somewhat true for me" ~ 3,
+                                     "Somewhat false for me" ~ 2,
+                                     "Very false for me" ~ 1))) |>
+  mutate(across(ends_with("_r"), ~ 5 - .x,
+                .names = "{str_replace(.col, '_r', '')}"),
+         .keep = "unused")
+
+imap(BAS |> select(-id), \(data, var) tibble(data) |>
+       ggplot(aes(x = data)) +
+       geom_bar() +
+       labs(x = var) +
+       scale_x_continuous(limits = c(0.5, 5.5),
+                          breaks = 1:5) + 
+       scale_y_continuous(NULL,
+                          breaks = NULL) +
+       guides(x = guide_axis(cap = "both")) +
+       theme_classic(base_size = 12) +
+       theme(axis.line.y = element_blank())) |>
+  wrap_plots()
+
+BAS_model <- BAS |>
+  select(-id) |>
+  names() |>
+  paste(collapse = " + ") |>
+  paste("BAS =~ ", ... = _)
+
+lavaan::cfa(model = BAS_model,
+            data = BAS,
+            estimator = "MLR") |>
+  semPlot::semPaths(what = "std")
+```
+:::
+
+::: {.callout-note collapse="true"}
+#### State Trait Anxiety Inventory (Trait)
+
+```{r}
+STAI <- dat_full |>
+  select(id, starts_with("STAI"), -matches("STAI-T_T"), -matches("STAI-T_attention")) |>
+  mutate(across(!id, ~ recode_values(.x,
+                                     "Almost never" ~ 4,
+                                     "Often" ~ 3,
+                                     "Sometimes" ~ 2,
+                                     "Almost always" ~ 1))) |>
+  mutate(across(ends_with("_r"), ~ 5 - .x,
+                .names = "{str_replace(.col, '_r', '')}"),
+         .keep = "unused") |>
+  rename_with(~ str_replace(.x, "-T", ""),
+              everything())
+
+imap(STAI |> select(-id), \(data, var) tibble(data) |>
+       ggplot(aes(x = data)) +
+       geom_bar() +
+       labs(x = var) +
+       scale_x_continuous(limits = c(0.5, 5.5),
+                          breaks = 1:5) + 
+       scale_y_continuous(NULL,
+                          breaks = NULL) +
+       guides(x = guide_axis(cap = "both")) +
+       theme_classic(base_size = 12) +
+       theme(axis.line.y = element_blank())) |>
+  wrap_plots()
+
+STAI_model <- STAI |>
+  select(-id) |>
+  names() |>
+  paste(collapse = " + ") |>
+  paste("STAI =~ ", ... = _)
+
+lavaan::cfa(model = STAI_model,
+            data = STAI,
+            estimator = "MLR") |>
+  semPlot::semPaths(what = "std")
+```
+:::
+
+### Decisions
+
+```{r}
+#| code-fold: show
+dat <- dat_full |>
+  select(id, matches("^[F][GL][PV]_[0-9\\.-]+$")) |>
+  pivot_longer(!id,
+               names_to = "item", values_to = "response") |>
+  filter(!is.na(response)) |>
+  separate_wider_regex(item, c(cond = "[F][GL][PV]", "_", rest = ".*")) |>
+  separate_wider_regex(rest, c(fixed = "^\\d*", "-*", varied = ".*")) |>
+  separate_wider_position(cond, c(1, "frame" = 1, "target" = 1)) |>
+  mutate(.by = c(frame, target, fixed),
+         item = cur_group_id(),
+         .after = id) |>
+  mutate(.by = c(item, id),
+         trial = row_number(),
+         .after = id) |>
+  mutate(varied = as.numeric(varied),
+         fixed = as.numeric(fixed),
+         lottery = ifelse(target == "P", varied, fixed),
+         certain = ifelse(target == "V", varied, fixed),
+         
+         lottery_std = (lottery - mean(lottery)) / sd(lottery),
+         certain_std = (certain - mean(certain)) / sd(lottery),
+         
+         # if matches the fixed dollar option, 0, else 1 (for risky)
+         chose_risky = ifelse(str_detect(response, "Keep \\$[0-9]+") | 
+                                str_detect(response, "Forfeit \\$[0-9]+"), 0, 1)) |>
+  left_join(IUS |>
+              pivot_longer(!id, names_to = "item", values_to = "response") |>
+              summarize(.by = id,
+                        IUS = mean(response)),
+            by = "id") |>
+  left_join(BIS |>
+              pivot_longer(!id, names_to = "item", values_to = "response") |>
+              summarize(.by = id,
+                        BIS = mean(response)),
+            by = "id") |>
+  left_join(BAS |>
+              pivot_longer(!id, names_to = "item", values_to = "response") |>
+              summarize(.by = id,
+                        BAS = mean(response)),
+            by = "id") |>
+  left_join(STAI |>
+              pivot_longer(!id, names_to = "item", values_to = "response") |>
+              summarize(.by = id,
+                        STAI_T = mean(response)),
+            by = "id") |>
+  mutate(ev_varied = ifelse(frame == "L", 100 - varied, varied),
+         ev_fixed = ifelse(frame == "L", 100 - fixed, fixed),
+         lottery_certain_diff = lottery_std - certain_std,
+         across(c(IUS, BIS, BAS, STAI_T), ~ (.x - mean(.x)) / sd(.x),
+                .names = "{.col}_z"))
+```
+
+
+## Modeling
+
+```{r}
+#| eval: false
+m0 <- lme4::glmer(chose_risky ~ 1 + (1 | item) + (1 | id),
+            dat, family = "binomial")
+saveRDS(m0, here::here("Models", "risky-choice_0.rds"))
+
+m1.0 <- lme4::glmer(chose_risky ~ IUS_z + BIS_z + BAS_z + STAI_T_z + lottery_certain_diff + frame + 
+                      (1 | item) + (1 | id), 
+                  dat, family = "binomial",
+                  lme4::glmerControl(optimizer = "bobyqa"))
+saveRDS(m1.0, here::here("Models", "risky-choice_1.0.rds"))
+
+m1.1 <- lme4::glmer(chose_risky ~ IUS_z + BIS_z + BAS_z + STAI_T_z + lottery_certain_diff + frame + 
+                      IUS_z:frame + BIS_z:frame + BAS_z:frame + STAI_T_z:frame + lottery_certain_diff:frame +
+                      IUS_z:lottery_certain_diff + BIS_z:lottery_certain_diff + BAS_z:lottery_certain_diff + STAI_T_z:lottery_certain_diff +
+                    (1 | item) + (1 | id), 
+                  dat, family = "binomial",
+                  lme4::glmerControl(optimizer = "bobyqa"))
+saveRDS(m1.1, here::here("Models", "risky-choice_1.1.rds"))
+```
+
+::: {style="font-size:70%"}
+``` {r}
+#| layout-ncol: 3
+m0 <- readRDS(here::here("Models", "risky-choice_0.rds"))
+m1.0 <- readRDS(here::here("Models", "risky-choice_1.0.rds"))
+m1.1 <- readRDS(here::here("Models", "risky-choice_1.1.rds"))
+
+sjPlot::tab_model(m0,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR",
+                 title = "Unconditional")
+sjPlot::tab_model(m1.0,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR",
+                 title = "No Interactions")
+sjPlot::tab_model(m1.1,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR",
+                 title = "Some Interactions")
+```
+:::
+
+##### Interaction Effects
+
+```{r}
+#| layout-ncol: 3
+#| fig-width: 3
+#| fig-height: 3
+#| message: false
+effect_labels <- list("STAI_T_z[all]" = "STAI_T",
+                      "frame" = "Frame",
+                      "IUS_z[all]" = "IUS",
+                      "lottery_certain_diff[all]" = "Lottery - Certain",
+                      "lottery_certain_diff" = "Lottery - Certain")
+
+sig_interactions <- list(c("STAI_T_z[all]", "frame"),
+                         c("lottery_certain_diff[all]", "frame"),
+                         c("IUS_z[all]", "lottery_certain_diff"))
+
+sig_interactions |> walk(~ (ggeffects::ggpredict(m1.1, .x) |>
+                              plot() +
+                              labs(title = NULL, y = "P(Chose Risky)",
+                                   x = effect_labels[.x[1]],
+                                   fill = effect_labels[.x[2]],
+                                   color = effect_labels[.x[2]]) +
+                              coord_cartesian(ylim = c(0, 1)) +
+                              theme_classic(base_size = 12) +
+                              theme(aspect.ratio = 1,
+                                    legend.position = "bottom")) |>
+                           print())
+```
+
+##### Main Effects
+
+```{r}
+#| layout-ncol: 3
+#| fig-width: 3
+#| fig-height: 3
+sig_mains <- list("STAI_T_z[all]", "lottery_certain_diff[all]", "frame")
+
+sig_mains |> walk(~ (ggeffects::ggpredict(m1.1, .x) |>
+                              plot() +
+                              labs(title = NULL, y = "P(Chose Risky)",
+                                   x = effect_labels[.x]) +
+                              coord_cartesian(ylim = c(0, 1)) +
+                              theme_classic(base_size = 12) +
+                              theme(aspect.ratio = 1)) |>
+                           print())
+```
+
+### Anxiety Scales Separate Models
+
+```{r}
+#| eval: false
+m1.2.1 <- lme4::glmer(chose_risky ~ IUS_z * lottery_certain_diff * frame +
+                    (1 | item) + (1 | id), 
+                  dat, family = "binomial",
+                  lme4::glmerControl(optimizer = "bobyqa"))
+m1.2.2 <- lme4::glmer(chose_risky ~ STAI_T_z * lottery_certain_diff * frame +
+                    (1 | item) + (1 | id), 
+                  dat, family = "binomial",
+                  lme4::glmerControl(optimizer = "bobyqa"))
+m1.2.3 <- lme4::glmer(chose_risky ~ BIS_z * lottery_certain_diff * frame +
+                    (1 | item) + (1 | id), 
+                  dat, family = "binomial",
+                  lme4::glmerControl(optimizer = "bobyqa"))
+m1.2.4 <- lme4::glmer(chose_risky ~ BAS_z * lottery_certain_diff * frame +
+                    (1 | item) + (1 | id), 
+                  dat, family = "binomial",
+                  lme4::glmerControl(optimizer = "bobyqa"))
+
+saveRDS(m1.2.1, here::here("Models", "risky-choice_1.2.1.rds"))
+saveRDS(m1.2.2, here::here("Models", "risky-choice_1.2.2.rds"))
+saveRDS(m1.2.3, here::here("Models", "risky-choice_1.2.3.rds"))
+saveRDS(m1.2.4, here::here("Models", "risky-choice_1.2.4.rds"))
+```
+
+
+::: {style="font-size:70%"}
+```{r}
+#| layout-ncol: 4
+m1.2.1 <- readRDS(here::here("Models", "risky-choice_1.2.1.rds"))
+m1.2.2 <- readRDS(here::here("Models", "risky-choice_1.2.2.rds"))
+m1.2.3 <- readRDS(here::here("Models", "risky-choice_1.2.3.rds"))
+m1.2.4 <- readRDS(here::here("Models", "risky-choice_1.2.4.rds"))
+
+sjPlot::tab_model(m1.2.1,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR")
+
+sjPlot::tab_model(m1.2.2,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR")
+
+sjPlot::tab_model(m1.2.3,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR")
+
+sjPlot::tab_model(m1.2.4,
+                 show.ci = F,
+                 show.se = T,
+                 string.se = "SE",
+                 show.r2 = F,
+                 dv.labels = "",
+                 string.est = "OR")
+```
+:::
+
+
+```{r}
+#| layout-ncol: 4
+#| layout-nrow: 2
+#| column: page
+#| fig-width: 5
+#| fig-height: 3
+list(scale = list("IUS_z", "STAI_T_z", "BIS_z", "BAS_z"),
+     model = list(m1.2.1, m1.2.2, m1.2.3, m1.2.4)) |>
+  pwalk(\(scale, model) (ggeffects::ggpredict(model, terms = c("lottery_certain_diff[all]", scale, "frame")) |>
+                              plot() +
+                              labs(title = scale, y = "P(Chose Risky)") +
+                              coord_cartesian(ylim = c(0, 1)) +
+                              theme_classic(base_size = 12) +
+                              theme(aspect.ratio = 1,
+                                    legend.position = "bottom")) |>
+         print())
+
+list(scale = list("IUS_z", "STAI_T_z ", "BIS_z", "BAS_z"),
+     model = list(m1.2.1, m1.2.2, m1.2.3, m1.2.4)) |>
+  pwalk(\(scale, model) (ggeffects::ggpredict(model, terms = c(paste(scale, "[all]"), "frame")) |>
+                              plot() +
+                              labs(title = scale, y = "P(Chose Risky)") +
+                              coord_cartesian(ylim = c(0, 1)) +
+                              theme_classic(base_size = 12) +
+                              theme(aspect.ratio = 1,
+                                    legend.position = "bottom")) |>
+         print())
+```
+
+
+
+
