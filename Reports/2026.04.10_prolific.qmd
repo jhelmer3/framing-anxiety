@@ -26,6 +26,10 @@ The [](2026.01.14_prolific.qmd) document used data that I think was not recoded 
 library(tidyverse)
 library(patchwork)
 library(gt)
+library(rstan)
+
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = T)
 ```
 
 #### Reading
@@ -148,6 +152,30 @@ lavaan::cfa(model = BIS_model,
             data = BIS,
             estimator = "MLR") |>
   semPlot::semPaths(what = "std")
+
+
+# gr_BIS <- rstan::stan(file = here::here("Models", "graded-response_2pl_code.stan"),
+#             data = list(K = 4,
+#                         N_student = nrow(BIS),
+#                         N_item = ncol(BIS) - 1, # taking out id column
+#                         Y = BIS |> select(-id)))
+# 
+# gr_BIS |>
+#   as.data.frame() |>
+#   select(starts_with("kappa[1"))
+# 
+# gr_BIS |>
+#   as.data.frame() |>
+#   slice_sample(n = 50) |>
+#   select(starts_with("a"), starts_with("b")) |>
+#   mutate(rep = row_number()) |>
+#   pivot_longer(!rep,
+#                names_to = c("par", ".value"),
+#                names_pattern = "([a-z]+)\\[(\\d)\\]") |>
+#   pivot_longer(!c(rep, par),
+#                names_to = "item", values_to = "est") |>
+#   pivot_wider(names_from = par, values_from = est) |>
+#   mutate(eta = )
 ```
 :::
 
@@ -257,6 +285,8 @@ dat <- dat_full |>
          fixed = as.numeric(fixed),
          lottery = ifelse(target == "P", varied, fixed),
          certain = ifelse(target == "V", varied, fixed),
+         ev_lottery = ifelse(frame == "L", 100 - lottery, lottery),
+         ev_certain = ifelse(frame == "L", 100 - certain, certain),
          
          lottery_std = (lottery - mean(lottery)) / sd(lottery),
          certain_std = (certain - mean(certain)) / sd(lottery),
@@ -284,9 +314,7 @@ dat <- dat_full |>
               summarize(.by = id,
                         STAI_T = mean(response)),
             by = "id") |>
-  mutate(ev_varied = ifelse(frame == "L", 100 - varied, varied),
-         ev_fixed = ifelse(frame == "L", 100 - fixed, fixed),
-         lottery_certain_diff = lottery_std - certain_std,
+  mutate(lottery_certain_diff = ev_lottery - ev_certain,
          across(c(IUS, BIS, BAS, STAI_T), ~ (.x - mean(.x)) / sd(.x),
                 .names = "{.col}_z"))
 ```
@@ -357,6 +385,8 @@ sjPlot::tab_model(m1.1,
 #| fig-height: 3
 #| message: false
 effect_labels <- list("STAI_T_z[all]" = "STAI_T",
+                      "BIS_z[all]" = "BIS_z",
+                      "BAS_z[all]" = "BAS_z",
                       "frame" = "Frame",
                       "IUS_z[all]" = "IUS",
                       "lottery_certain_diff[all]" = "Lottery - Certain",
@@ -364,7 +394,9 @@ effect_labels <- list("STAI_T_z[all]" = "STAI_T",
 
 sig_interactions <- list(c("STAI_T_z[all]", "frame"),
                          c("lottery_certain_diff[all]", "frame"),
-                         c("IUS_z[all]", "lottery_certain_diff"))
+                         c("IUS_z[all]", "lottery_certain_diff"),
+                         c("BIS_z[all]", "lottery_certain_diff"),
+                         c("BAS_z[all]", "lottery_certain_diff"))
 
 sig_interactions |> walk(~ (ggeffects::ggpredict(m1.1, .x) |>
                               plot() +
@@ -382,10 +414,11 @@ sig_interactions |> walk(~ (ggeffects::ggpredict(m1.1, .x) |>
 ##### Main Effects
 
 ```{r}
-#| layout-ncol: 3
+#| layout-ncol: 4
 #| fig-width: 3
 #| fig-height: 3
-sig_mains <- list("STAI_T_z[all]", "lottery_certain_diff[all]", "frame")
+#| column: page
+sig_mains <- list("BIS_z[all]", "BAS_z[all]", "lottery_certain_diff[all]", "frame")
 
 sig_mains |> walk(~ (ggeffects::ggpredict(m1.1, .x) |>
                               plot() +
